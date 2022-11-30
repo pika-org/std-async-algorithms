@@ -91,10 +91,22 @@ concept execution_property = is_execution_property<P>::value;
 // range, etc.). However, the scheduler and/or tag_invoke customizations with
 // the scheduler must still at some point be allowed to access the data at some
 // point.
-template <typename ExecutionPolicy> struct execution_properties {
-  ExecutionPolicy policy;
-  // etc.
+//
+// Compromise: schedulers are fundamentally what hold properties, but they can
+// be overridden on a per-call basis.
+template <typename... Properties>
+requires
+    // clang-format off
+    (execution_property<Properties> &&...)
+    // clang-format on
+    struct execution_properties {
+  std::tuple<std::decay_t<Properties>...> properties;
 };
+
+template <typename... Properties> auto make_execution_properties(Properties &&...properties) {
+  return execution_properties<std::decay_t<Properties>...>(
+      {std::forward<Properties>(properties)...});
+}
 
 template <typename ExecutionPolicy>
 concept execution_policy =
@@ -103,8 +115,12 @@ concept execution_policy =
     std::same_as<std::decay_t<ExecutionPolicy>, std::execution::parallel_policy> ||
     std::same_as<std::decay_t<ExecutionPolicy>, std::execution::parallel_unsequenced_policy>;
 
+template <execution_policy ExecutionPolicy>
+struct is_execution_property<ExecutionPolicy> : std::true_type {};
+
 // TODO: This is an attempt at a lightweight property mechanism for
-// schedulers.
+// schedulers. This can probably take many forms. The important thing is that
+// they can be required on schedulers/parallel algorithm call sitesV
 struct with_execution_property_t {
   // All properties that have a customization for the given scheduler are
   // applied.
@@ -125,7 +141,6 @@ struct with_execution_property_t {
   template <stdexec::scheduler Scheduler, execution_property ExecutionProperty>
   requires
       // clang-format off
-      (!execution_policy<ExecutionProperty>) &&
       (!stdexec::tag_invocable<with_execution_property_t, Scheduler const &, ExecutionProperty>)
       // clang-format on
       decltype(auto)
@@ -133,18 +148,34 @@ struct with_execution_property_t {
     return std::forward<Scheduler>(sched);
   }
 
-  // All schedulers must support setting the execution policy for parallel
-  // algorithms. Not being able to do so is an error.
-  template <stdexec::scheduler Scheduler, execution_property ExecutionProperty>
+  // TODO: Is an execution policy a required property of schedulers that are
+  // passed to parallel algorithms?
+
+  template <stdexec::scheduler Scheduler, execution_property ExecutionProperty0,
+            execution_property... Rest>
   requires
       // clang-format off
-      (execution_policy<ExecutionProperty>) &&
-      (!stdexec::tag_invocable<with_execution_property_t, Scheduler const &, ExecutionProperty>)
+      (!stdexec::tag_invocable<with_execution_property_t, Scheduler const &, ExecutionProperty0, Rest...>)
       // clang-format on
       auto
-      operator()(stdexec::scheduler auto const &sched,
-                 ExecutionProperty &&exec_property) const = delete;
+      operator()(stdexec::scheduler auto const &sched, ExecutionProperty0 &&exec_property0,
+                 Rest &&...rest) const {
+    return with_execution_property_t{}(
+        with_execution_property_t{}(sched, std::forward<ExecutionProperty0>(exec_property0)),
+        std::forward<Rest>(rest)...);
+  };
 };
+
+// TODO: forwarding/moving/const/ref is not consistent.
+template <stdexec::scheduler Scheduler, typename... Properties>
+auto with_execution_properties(Scheduler const &sched,
+                               execution_properties<Properties...> exec_properties) {
+  return std::apply(
+      [&](auto &&...p) {
+        return with_execution_properties(sched, std::forward<decltype(p)>(p)...);
+      },
+      std::move(exec_properties.properties));
+}
 
 struct for_each_t {
   // Overloads have the following priority:
@@ -206,7 +237,7 @@ struct for_each_t {
     return stdexec::tag_invoke(std::forward<Sender>(sender), std::forward<F>(f));
   }
 
-  // Forward to default implementation with seq policy
+  // Forward to default implementation with default execution properties
   template <stdexec::sender Sender, typename F>
   requires
       // clang-format off
@@ -215,30 +246,34 @@ struct for_each_t {
       // clang-format on
       stdexec::sender auto
       operator()(Sender &&sender, F &&f) const {
-    return for_each_t{}(std::execution::seq, std::forward<Sender>(sender), std::forward<F>(f));
+    return for_each_t{}(execution_properties<>{}, std::forward<Sender>(sender), std::forward<F>(f));
   }
 
   // Default implementation
-  template <typename ExecutionPolicy, stdexec::sender Sender, typename F>
+  template <stdexec::sender Sender, typename F, typename... Properties>
   requires
       // clang-format off
       (!stdexec::__tag_invocable_with_completion_scheduler<for_each_t, stdexec::set_value_t, Sender, F>) &&
-      (!stdexec::tag_invocable<for_each_t, Sender, F>) &&
-      (execution_policy<ExecutionPolicy>)
+      (!stdexec::tag_invocable<for_each_t, Sender, F>)
       // clang-format on
       stdexec::sender auto
-      operator()(ExecutionPolicy &&exec_policy, Sender &&sender, F &&f) const {
+      operator()(execution_properties<Properties...> const &exec_properties, Sender &&sender,
+                 F &&f) const {
     // TODO: Should a (completion) scheduler be required?
     if constexpr (stdexec::__has_completion_scheduler<Sender, stdexec::set_value_t>) {
       stdexec::scheduler auto sched =
           stdexec::get_completion_scheduler<stdexec::set_value_t>(sender);
       return stdexec::let_value(
           std::forward<Sender>(sender),
-          [f = std::forward<F>(f), sched = std::move(sched)](auto &b, auto &e) {
+          [f = std::forward<F>(f), sched = std::move(sched), exec_properties](auto &b, auto &e) {
             // TODO: Is it allowed for this to be executed on an arbitrary
             // execution context?
             auto n = std::distance(b, e);
-            // TODO: Apply execution policy to scheduler.
+
+            // TODO: This could use something a bit nicer.
+            stdexec::scheduler auto sched_with_properties =
+                with_execution_properties(sched, exec_properties);
+
             return stdexec::schedule(std::move(sched)) |
                    stdexec::bulk(n, [b = std::move(b), e = std::move(e), f = std::move(f)](auto i) {
                      f(b[i]);
@@ -264,6 +299,9 @@ struct for_each_t {
   // TODO: std::linalg overloads?
 };
 } // namespace detail
+
+using detail::execution_properties;
+using detail::make_execution_properties;
 
 using for_each_t = detail::for_each_t;
 inline constexpr for_each_t for_each{};

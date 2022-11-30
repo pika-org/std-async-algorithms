@@ -13,9 +13,11 @@ int main() {
   auto p = std::execution::par;
 
   std::vector<int> v{1, 2, 3};
-  stdexec::this_thread::sync_wait(
-      stdalgos::for_each(std::execution::par, stdexec::just(v.begin(), v.end()),
-                         [](int x) { std::cerr << "x = " << x << '\n'; }));
+  // TODO: It should be possible to pass a plain execution_policy without
+  // explicitly wrapping it in execution_properties.
+  stdexec::this_thread::sync_wait(stdalgos::for_each(
+      stdalgos::make_execution_properties(std::execution::par), stdexec::just(v.begin(), v.end()),
+      [](int x) { std::cerr << "x = " << x << '\n'; }));
 
   stdexec::this_thread::sync_wait(stdalgos::for_each(
       stdexec::just(v.begin(), v.end()), [](int x) { std::cerr << "x = " << x << '\n'; }));
