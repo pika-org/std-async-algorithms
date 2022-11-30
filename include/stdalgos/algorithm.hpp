@@ -61,59 +61,61 @@ struct for_each_t {
       operator()(Scheduler &&sched, It b, It e, F &&f) const {
     // Fall back to synchronizing the asynchronous overload if no synchronous
     // customization is available.
-    stdexec::this_thread::sync_wait(for_each_t{}(stdexec::transfer_just(
-        std::forward<Scheduler>(sched), b, e, std::forward<F>(f))));
+    stdexec::this_thread::sync_wait(for_each_t{}(
+        stdexec::transfer_just(std::forward<Scheduler>(sched), b, e),
+        std::forward<F>(f)));
   }
 
   // Asynchronous overloads
 
   // Scheduler customization
-  template <stdexec::sender Sender>
+  template <stdexec::sender Sender, typename F>
   requires
       // clang-format off
-      (stdexec::__tag_invocable_with_completion_scheduler<for_each_t, stdexec::set_value_t, Sender>)
+      (stdexec::__tag_invocable_with_completion_scheduler<for_each_t, stdexec::set_value_t, Sender, F>)
       // clang-format on
       stdexec::sender auto
-      operator()(Sender &&sender) const {
+      operator()(Sender &&sender, F &&f) const {
     return stdexec::tag_invoke(
         stdexec::get_completion_scheduler<stdexec::set_value_t>(sender),
-        std::forward<Sender>(sender));
+        std::forward<Sender>(sender), std::forward<F>(f));
   }
 
   // Sender customization
-  template <stdexec::sender Sender>
+  template <stdexec::sender Sender, typename F>
   requires
       // clang-format off
-      (!stdexec::__tag_invocable_with_completion_scheduler<for_each_t, stdexec::set_value_t, Sender>) &&
-      (stdexec::tag_invocable<for_each_t, Sender>)
+      (!stdexec::__tag_invocable_with_completion_scheduler<for_each_t, stdexec::set_value_t, Sender, F>) &&
+      (stdexec::tag_invocable<for_each_t, Sender, F>)
       // clang-format on
       stdexec::sender auto
-      operator()(Sender &&sender) const {
-    return stdexec::tag_invoke(std::forward<Sender>(sender));
+      operator()(Sender &&sender, F &&f) const {
+    return stdexec::tag_invoke(std::forward<Sender>(sender),
+                               std::forward<F>(f));
   }
   // Default implementation
-  template <stdexec::sender Sender>
+  template <stdexec::sender Sender, typename F>
   requires
       // clang-format off
-      (!stdexec::__tag_invocable_with_completion_scheduler<for_each_t, stdexec::set_value_t, Sender>) &&
-      (!stdexec::tag_invocable<for_each_t, Sender>)
+      (!stdexec::__tag_invocable_with_completion_scheduler<for_each_t, stdexec::set_value_t, Sender, F>) &&
+      (!stdexec::tag_invocable<for_each_t, Sender, F>)
       // clang-format on
       stdexec::sender auto
-      operator()(Sender &&sender) const {
-    // This case requires random access iterators. Could fall back to plain for
-    // loop if something weaker. Must still run on scheduler.
+      operator()(Sender &&sender, F &&f) const {
     return stdexec::let_value(
-        std::forward<Sender>(sender), [](auto &b, auto &e, auto &&f) {
+        std::forward<Sender>(sender),
+        [f = std::forward<F>(f)](auto &b, auto &e) {
           auto n = std::distance(b, e);
           return stdexec::just() |
                  stdexec::bulk(n, [b = std::move(b), e = std::move(e),
-                                   f = std::forward<decltype(f)>(f)](auto i) {
-                   f(b[i]);
-                 });
+                                   f = std::move(f)](auto i) { f(b[i]); });
         });
   }
 
+  // The following don't necessarily have to be specified, but it must be
+  // possible to use the same principles for them in the future.
   // TODO: Ranges overloads?
+  // TODO: std::linalg overloads?
 };
 } // namespace detail
 

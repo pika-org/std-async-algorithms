@@ -10,6 +10,7 @@ int main() {
   stdexec::scheduler auto sched = pool.get_scheduler();
 
   std::vector<int> v{1, 2, 3};
-  stdexec::this_thread::sync_wait(stdalgos::for_each(stdexec::just(
-      v.begin(), v.end(), [](int x) { std::cerr << "x = " << x << '\n'; })));
+  stdexec::this_thread::sync_wait(
+      stdalgos::for_each(stdexec::just(v.begin(), v.end()),
+                         [](int x) { std::cerr << "x = " << x << '\n'; }));
 }
