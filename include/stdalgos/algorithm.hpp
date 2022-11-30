@@ -70,11 +70,16 @@
 
 #pragma once
 
+#include <execution>
 #include <stdexec/execution.hpp>
 #include <stdexec/functional.hpp>
 
 namespace stdalgos {
 namespace detail {
+template <typename> struct is_execution_property : std::false_type {};
+template <typename P>
+concept execution_property = is_execution_property<P>::value;
+
 // TODO: Let scheduler be provided from the environment/sender. Pack all other
 // properties, including the execution policy, into something else? This _must_
 // be extensible so that one can add scheduler-specific properties. Requiring it
@@ -89,6 +94,56 @@ namespace detail {
 template <typename ExecutionPolicy> struct execution_properties {
   ExecutionPolicy policy;
   // etc.
+};
+
+template <typename ExecutionPolicy>
+concept execution_policy =
+    std::same_as<std::decay_t<ExecutionPolicy>, std::execution::sequenced_policy> ||
+    std::same_as<std::decay_t<ExecutionPolicy>, std::execution::unsequenced_policy> ||
+    std::same_as<std::decay_t<ExecutionPolicy>, std::execution::parallel_policy> ||
+    std::same_as<std::decay_t<ExecutionPolicy>, std::execution::parallel_unsequenced_policy>;
+
+// TODO: This is an attempt at a lightweight property mechanism for
+// schedulers.
+struct with_execution_property_t {
+  // All properties that have a customization for the given scheduler are
+  // applied.
+  template <stdexec::scheduler Scheduler, execution_property ExecutionProperty>
+  requires
+      // clang-format off
+      (stdexec::tag_invocable<with_execution_property_t, Scheduler const &, ExecutionProperty>)
+      // clang-format on
+      auto
+      operator()(Scheduler const &sched, ExecutionProperty &&exec_property) const {
+    return stdexec::tag_invoke(with_execution_property_t{}, sched,
+                               std::forward<ExecutionProperty>(exec_property));
+  }
+
+  // Custom properties that can't be applied to the given scheduler are ignored.
+  // TODO: Is this wise? See prefer/require from the various properties
+  // proposals.
+  template <stdexec::scheduler Scheduler, execution_property ExecutionProperty>
+  requires
+      // clang-format off
+      (!execution_policy<ExecutionProperty>) &&
+      (!stdexec::tag_invocable<with_execution_property_t, Scheduler const &, ExecutionProperty>)
+      // clang-format on
+      decltype(auto)
+      operator()(Scheduler &&sched, ExecutionProperty &&exec_property) const {
+    return std::forward<Scheduler>(sched);
+  }
+
+  // All schedulers must support setting the execution policy for parallel
+  // algorithms. Not being able to do so is an error.
+  template <stdexec::scheduler Scheduler, execution_property ExecutionProperty>
+  requires
+      // clang-format off
+      (execution_policy<ExecutionProperty>) &&
+      (!stdexec::tag_invocable<with_execution_property_t, Scheduler const &, ExecutionProperty>)
+      // clang-format on
+      auto
+      operator()(stdexec::scheduler auto const &sched,
+                 ExecutionProperty &&exec_property) const = delete;
 };
 
 struct for_each_t {
