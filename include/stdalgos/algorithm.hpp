@@ -18,10 +18,55 @@
 // fallbacks...). How would one recreate (i.e. get exactly the same behaviour)
 // std::for_each(std::execution::par, b, e, f)
 // using the asynchronous overloads?
-// transfer_just(system_context().get_scheduler(), b, e) | stdalgos::for_each(f)
+//
+// transfer_just(system_context().get_scheduler(), b, e) |
+//   stdalgos::for_each(std::execution::par, f)?
+//
+// just(b, e) | stdalgos::for_each(std::execution::par, f)?
+//
+// transfer_just(with_policy(system_context().get_scheduler(), std::execution::par), b, e) |
+//   stdalgos::for_each(f)?
+//
+// Should for_each above be sequential? Probably yes. The policy on the
+// scheduler may not be visible to the writer at the for_each call. Or should
+// the par set the default and it can be overridden at the for_each callsite?
 //
 // TODO: Should seq/par/par_unseq have a relation to forward progress guarantees
 // of a scheduler?
+//
+// NOTE: Comparison to HPX's mechanism:
+// HPX bundles all "properties" into the execution policy for parallel
+// algorithms, including whether or not a particular invocation is asynchronous
+// or not:
+// - hpx::execution::par: use parallel policy with default scheduler
+// - par.on(executor/scheduler): use parallel policy on a particular executor
+//   (the executor advertises if it supports a given policy)
+// - par(task).on(executor): the invocation will return a future
+// - par(task).on(executor).with(chunk_size): apply a given chunk size to the
+//   invocation
+// - par(task).on(with_priority/stacksize(executor)).with(chunk_size): apply a
+//   given priority/stacksize to the executor
+//
+// Differences to what's below:
+// - synchronous/asynchronous execution is handled by the same(-looking)
+//   overloads in HPX. This should be separate overloads (potentially in
+//   different namespaces).
+// - the executor/scheduler is provided per-call in HPX. This should be provided
+//   with the same mechanism as all other P2300 algorithms
+//   (get_completion_scheduler/connect?).
+//
+// NOTE: Comparison to Kokkos' mechanism:
+// Kokkos also bundles all "properties" into an execution policy, including
+// where something runs. Kokkos does not have fundamental support for
+// asynchronous execution, though in practice it does happen with some execution
+// spaces (which requires fencing eventually; think async_scope with
+// start_detached followed by sync_wait on async_scope::empty). Kokkos also
+// combines the iteration pattern into the execution policy.
+// - Kokkos::RangePolicy(): default execution space
+// - Kokkos::RangePolicy<Kokkos::Cuda>(): a specific execution space
+// - Kokkos::RangePolicy<Kokkos::Cuda>().set_chunk_size(chunk_size): use a given
+//   chunk size
+// - require(Kokkos::RangePolicy<Kokkos::Cuda>(), hint): use a given hint
 
 #pragma once
 
