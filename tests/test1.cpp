@@ -2,7 +2,7 @@
 
 #include <exec/static_thread_pool.hpp>
 #include <iostream>
-#include <std_async_algos/algorithm.hpp>
+#include <stdalgos/algorithm.hpp>
 #include <stdexec/execution.hpp>
 
 int main() {

@@ -14,5 +14,5 @@ target_link_libraries(std_async_algorithms INTERFACE STDEXEC::stdexec)
 
 # Test executable
 add_executable(test1 tests/test1.cpp)
-target_link_libraries(test PRIVATE std_async_algorithms $<TARGET_NAME_IF_EXISTS:pika::pika>)
-target_compile_definitions(test PRIVATE $<$<TARGET_EXISTS:pika::pika>:STD_ASYNC_ALGOS_HAVE_PIKA>)
+target_link_libraries(test1 PRIVATE std_async_algorithms $<TARGET_NAME_IF_EXISTS:pika::pika>)
+target_compile_definitions(test1 PRIVATE $<$<TARGET_EXISTS:pika::pika>:STD_ASYNC_ALGOS_HAVE_PIKA>)
