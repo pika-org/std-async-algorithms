@@ -164,8 +164,7 @@ struct for_each_t {
       stdexec::sender auto
       operator()(Scheduler &&sched, It b, It e, F &&f) const {
     // This allows for specializing/optimizing the synchronous case directly
-    stdexec::tag_invoke(*this, std::forward<Scheduler>(sched), b, e,
-                        std::forward<F>(f));
+    stdexec::tag_invoke(*this, std::forward<Scheduler>(sched), b, e, std::forward<F>(f));
   }
 
   template <stdexec::scheduler Scheduler, typename It, typename F>
@@ -178,8 +177,7 @@ struct for_each_t {
     // Fall back to synchronizing the asynchronous overload if no synchronous
     // customization is available.
     stdexec::this_thread::sync_wait(for_each_t{}(
-        stdexec::transfer_just(std::forward<Scheduler>(sched), b, e),
-        std::forward<F>(f)));
+        stdexec::transfer_just(std::forward<Scheduler>(sched), b, e), std::forward<F>(f)));
   }
 
   // Asynchronous overloads
@@ -192,9 +190,8 @@ struct for_each_t {
       // clang-format on
       stdexec::sender auto
       operator()(Sender &&sender, F &&f) const {
-    return stdexec::tag_invoke(
-        stdexec::get_completion_scheduler<stdexec::set_value_t>(sender),
-        std::forward<Sender>(sender), std::forward<F>(f));
+    return stdexec::tag_invoke(stdexec::get_completion_scheduler<stdexec::set_value_t>(sender),
+                               std::forward<Sender>(sender), std::forward<F>(f));
   }
 
   // Sender customization
@@ -206,10 +203,10 @@ struct for_each_t {
       // clang-format on
       stdexec::sender auto
       operator()(Sender &&sender, F &&f) const {
-    return stdexec::tag_invoke(std::forward<Sender>(sender),
-                               std::forward<F>(f));
+    return stdexec::tag_invoke(std::forward<Sender>(sender), std::forward<F>(f));
   }
-  // Default implementation
+
+  // Forward to default implementation with seq policy
   template <stdexec::sender Sender, typename F>
   requires
       // clang-format off
@@ -218,14 +215,47 @@ struct for_each_t {
       // clang-format on
       stdexec::sender auto
       operator()(Sender &&sender, F &&f) const {
-    return stdexec::let_value(
-        std::forward<Sender>(sender),
-        [f = std::forward<F>(f)](auto &b, auto &e) {
-          auto n = std::distance(b, e);
-          return stdexec::just() |
-                 stdexec::bulk(n, [b = std::move(b), e = std::move(e),
-                                   f = std::move(f)](auto i) { f(b[i]); });
-        });
+    return for_each_t{}(std::execution::seq, std::forward<Sender>(sender), std::forward<F>(f));
+  }
+
+  // Default implementation
+  template <typename ExecutionPolicy, stdexec::sender Sender, typename F>
+  requires
+      // clang-format off
+      (!stdexec::__tag_invocable_with_completion_scheduler<for_each_t, stdexec::set_value_t, Sender, F>) &&
+      (!stdexec::tag_invocable<for_each_t, Sender, F>) &&
+      (execution_policy<ExecutionPolicy>)
+      // clang-format on
+      stdexec::sender auto
+      operator()(ExecutionPolicy &&exec_policy, Sender &&sender, F &&f) const {
+    // TODO: Should a (completion) scheduler be required?
+    if constexpr (stdexec::__has_completion_scheduler<Sender, stdexec::set_value_t>) {
+      stdexec::scheduler auto sched =
+          stdexec::get_completion_scheduler<stdexec::set_value_t>(sender);
+      return stdexec::let_value(
+          std::forward<Sender>(sender),
+          [f = std::forward<F>(f), sched = std::move(sched)](auto &b, auto &e) {
+            // TODO: Is it allowed for this to be executed on an arbitrary
+            // execution context?
+            auto n = std::distance(b, e);
+            // TODO: Apply execution policy to scheduler.
+            return stdexec::schedule(std::move(sched)) |
+                   stdexec::bulk(n, [b = std::move(b), e = std::move(e), f = std::move(f)](auto i) {
+                     f(b[i]);
+                   });
+          });
+    } else {
+      // If there's no completion scheduler there's nothing to apply the
+      // execution policy or properties to.
+      // TODO: Should this fall back to the system_context scheduler? Possibly
+      // yes, especially if the execution policy is par.
+      return stdexec::let_value(
+          std::forward<Sender>(sender), [f = std::forward<F>(f)](auto &b, auto &e) {
+            auto n = std::distance(b, e);
+            return stdexec::just() | stdexec::bulk(n, [b = std::move(b), e = std::move(e),
+                                                       f = std::move(f)](auto i) { f(b[i]); });
+          });
+    }
   }
 
   // The following don't necessarily have to be specified, but it must be
