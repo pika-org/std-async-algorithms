@@ -192,10 +192,10 @@ struct for_each_t {
       // clang-format off
       (stdexec::tag_invocable<for_each_t, Scheduler, It, It, F>)
       // clang-format on
-      stdexec::sender auto
+      void
       operator()(Scheduler &&sched, It b, It e, F &&f) const {
     // This allows for specializing/optimizing the synchronous case directly
-    stdexec::tag_invoke(*this, std::forward<Scheduler>(sched), b, e, std::forward<F>(f));
+    stdexec::tag_invoke(for_each_t{}, std::forward<Scheduler>(sched), b, e, std::forward<F>(f));
   }
 
   template <stdexec::scheduler Scheduler, typename It, typename F>
@@ -203,7 +203,7 @@ struct for_each_t {
       // clang-format off
       (!stdexec::tag_invocable<for_each_t, Scheduler, It, It, F>)
       // clang-format on
-      stdexec::sender auto
+      void
       operator()(Scheduler &&sched, It b, It e, F &&f) const {
     // Fall back to synchronizing the asynchronous overload if no synchronous
     // customization is available.
