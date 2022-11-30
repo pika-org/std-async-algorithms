@@ -211,6 +211,17 @@ struct for_each_t {
         stdexec::transfer_just(std::forward<Scheduler>(sched), b, e), std::forward<F>(f)));
   }
 
+  // This should be identical to the existing for_each(exec_policy, ...)
+  // overload in std. Included only for completeness.
+  template <execution_policy ExecutionPolicy, typename It, typename F>
+  void operator()(ExecutionPolicy &&exec_policy, It b, It e, F &&f) const {
+    // Fall back to synchronizing the asynchronous overload if no synchronous
+    // customization is available.
+    stdexec::this_thread::sync_wait(
+        for_each_t{}(make_execution_properties(std::forward<ExecutionPolicy>(exec_policy)),
+                     stdexec::just(b, e), std::forward<F>(f)));
+  }
+
   // Asynchronous overloads
 
   // Scheduler customization
