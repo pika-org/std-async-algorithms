@@ -30,6 +30,22 @@
 
 namespace stdalgos {
 namespace detail {
+// TODO: Let scheduler be provided from the environment/sender. Pack all other
+// properties, including the execution policy, into something else? This _must_
+// be extensible so that one can add scheduler-specific properties. Requiring it
+// be extensible is one argument for just bundling it with the scheduler instead
+// and providing some sort of env from it.
+//
+// An argument against bundling it with the scheduler is that execution policy,
+// chunk sizes etc. are call-specific (may depend on data, callable, iteration
+// range, etc.). However, the scheduler and/or tag_invoke customizations with
+// the scheduler must still at some point be allowed to access the data at some
+// point.
+template <typename ExecutionPolicy> struct execution_properties {
+  ExecutionPolicy policy;
+  // etc.
+};
+
 struct for_each_t {
   // Overloads have the following priority:
   // 1. synchronous tag_invoke customization
