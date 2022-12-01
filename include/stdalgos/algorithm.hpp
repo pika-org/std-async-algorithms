@@ -178,15 +178,14 @@ auto with_execution_properties(Scheduler const &sched,
 }
 
 struct for_each_t {
-  // Overloads have the following priority:
-  // 1. synchronous tag_invoke customization
-  // 2. synchronus default implementation which sync_waits asynchronous
-  //    overload
-  // 3. asynchronous tag_invoke customization with completion scheduler
-  // 4. asynchronous tag_invoke overload on sender
-  // 4. asynchronous default implementation based on bulk
+  // TODO: What is the basis set? What are the fundamental overloads? This is
+  // currently a bit too free-form...
 
-  // Synchronous overload
+  // Synchronous overloads
+
+  // Overload with scheduler and tag_invoke customization: This exists to allow
+  // optimizing the synchronous case. In most cases it should not be necessary
+  // to customize this.
   template <stdexec::scheduler Scheduler, typename It, typename F>
   requires
       // clang-format off
@@ -198,6 +197,9 @@ struct for_each_t {
     stdexec::tag_invoke(for_each_t{}, std::forward<Scheduler>(sched), b, e, std::forward<F>(f));
   }
 
+  // Default synchronous implementation with a scheduler but without a
+  // tag_invoke customization: This falls back to sync_waiting one of the
+  // asynchronous overloads.
   template <stdexec::scheduler Scheduler, typename It, typename F>
   requires
       // clang-format off
@@ -205,14 +207,13 @@ struct for_each_t {
       // clang-format on
       void
       operator()(Scheduler &&sched, It b, It e, F &&f) const {
-    // Fall back to synchronizing the asynchronous overload if no synchronous
-    // customization is available.
     stdexec::this_thread::sync_wait(for_each_t{}(
         stdexec::transfer_just(std::forward<Scheduler>(sched), b, e), std::forward<F>(f)));
   }
 
   // This should be identical to the existing for_each(exec_policy, ...)
-  // overload in std. Included only for completeness.
+  // overload in std. Included only for completeness. This is not meant to be
+  // customized. It should fall back to the very default implementation.
   template <execution_policy ExecutionPolicy, typename It, typename F>
   void operator()(ExecutionPolicy &&exec_policy, It b, It e, F &&f) const {
     // Fall back to synchronizing the asynchronous overload if no synchronous
@@ -224,7 +225,8 @@ struct for_each_t {
 
   // Asynchronous overloads
 
-  // Scheduler customization
+  // Overload when there is a tag_invoke overload and a completion scheduler
+  // from the sender.
   template <stdexec::sender Sender, typename F>
   requires
       // clang-format off
