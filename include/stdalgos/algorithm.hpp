@@ -206,24 +206,23 @@ struct for_each_t {
   // - Are so many levels necessary? Can some levels be left out to keep things simple?
   // - Can the policy and properties overloads be collapsed (they're essentially the same)?
   // - Do the property/policy-less overloads default to seq or use some default from scheduler?
+  // - Is the last overload necessary or should one prefer on(scheduler, algo(f))?
   //
-  // 1. algo(f, ...) -> for_each(seq, f, ...) [not customizable]
-  // 2. algo(policy, f, ...) -> algo(properties(policy), f, ...) [not customizable]
-  // 3. algo(properties, f, ...) -> algo(with(system_scheduler, properties), f, ...) [not customizable]
-  // 4. [this is P2500] algo(scheduler, f, ...) -> [scheduler customization] or
+  // 1. algo(f, ...) -> algo(seq, f, ...) or algo(system_scheduler, f, ...) [not customizable]
+  // 2. algo(properties, f, ...) -> algo(with(system_scheduler, properties), f, ...) [not customizable]
+  // 3. [this is P2500] algo(scheduler, f, ...) -> [scheduler customization 1.] or
   //                                               sync_wait(algo(scheduler, f, just(...)))
-  // 5. algo(sender, f) -> [completion_scheduler(sender) customization] or
-  //                       [sender customization (with properties(seq)?)] or
+  // 4. algo(sender, f) -> [completion_scheduler(sender) customization 2.] or
+  //                       [sender customization (with properties(seq)?) 3.] or
   //                       algo(completion_scheduler(sender), sender, f) or
   //                       algo(system_scheduler, f, sender)
-  // 6. algo(sender, policy, f) -> algo(sender, properties(policy), f) [not customizable]
-  // 7. algo(sender, properties, f) -> [with(completion_scheduler(sender), properties) customization] or
-  //                                   [sender customization] or
+  // 5. algo(sender, properties, f) -> [with(completion_scheduler(sender), properties) customization 2.] or
+  //                                   [sender customization 3.] or
   //                                   algo(with(completion_scheduler(sender), properties), sender, f) or
   //                                   algo(with(system_scheduler, properties), sender, f)
-  // 8. algo(scheduler, sender, f) -> [scheduler customization] or
-  //                                  [sender customization] or
-  //                                  default implementation
+  // 6. algo(scheduler, sender, f) -> [scheduler customization 2.] or
+  //                                  [sender customization 3.] or
+  //                                  [default implementation: look at this carefully to make sure execution policy requirements are not violated]
   //
   // The above exposes three customization points, which are used in this order
   // (though not all are applicable in all situations):
