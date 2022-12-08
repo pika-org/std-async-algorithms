@@ -207,28 +207,25 @@ struct for_each_t {
   // - Can the policy and properties overloads be collapsed (they're essentially the same)?
   // - Do the property/policy-less overloads default to seq or use some default from scheduler?
   // - Is the last overload necessary or should one prefer on(scheduler, algo(f))?
+  // - Are customizations correctly taken into account with a mix of on(...) and
+  //   get_completion_scheduler? Probably not. The below needs to change if
+  //   P2300 changes how schedulers are taken into account (through senders or
+  //   receivers).
   //
-  // 1. algo(f, ...) -> algo(seq, f, ...) or algo(system_scheduler, f, ...) [not customizable]
+  // 1. algo(f, ...) -> algo(properties(), f, ...) or algo(system_scheduler, f, ...) [not customizable]
   // 2. algo(properties, f, ...) -> algo(with(system_scheduler, properties), f, ...) [not customizable]
   // 3. [this is P2500] algo(scheduler, f, ...) -> [scheduler customization 1.] or
-  //                                               sync_wait(algo(scheduler, f, just(...)))
-  // 4. algo(sender, f) -> [completion_scheduler(sender) customization 2.] or
-  //                       [sender customization (with properties(seq)?) 3.] or
-  //                       algo(completion_scheduler(sender), sender, f) or
-  //                       algo(system_scheduler, f, sender)
+  //                                               sync_wait(just(...) | on(scheduler, algo(f))
+  // 4. algo(sender, f) -> algo(sender, properties(), f)
   // 5. algo(sender, properties, f) -> [with(completion_scheduler(sender), properties) customization 2.] or
   //                                   [sender customization 3.] or
-  //                                   algo(with(completion_scheduler(sender), properties), sender, f) or
-  //                                   algo(with(system_scheduler, properties), sender, f)
-  // 6. algo(scheduler, sender, f) -> [scheduler customization 2.] or
-  //                                  [sender customization 3.] or
-  //                                  [default implementation: look at this carefully to make sure execution policy requirements are not violated]
+  //                                   [default implementation: look at this carefully to make sure execution policy requirements are not violated]
   //
   // The above exposes three customization points, which are used in this order
   // (though not all are applicable in all situations):
-  // 1. tag_invoke(algo_t, scheduler, f, ...)
-  // 2. tag_invoke(algo_t, scheduler, sender, additional_properties, f)
-  // 3. tag_invoke(algo_t, sender, additional_properties, f)
+  // 1. tag_invoke(algo_t, scheduler, f, ...) [blocking]
+  // 2. tag_invoke(algo_t, scheduler, sender, f) [asynchronous]
+  // 3. tag_invoke(algo_t, sender, properties, f) [asynchronous]
 
   // Synchronous overloads
 
