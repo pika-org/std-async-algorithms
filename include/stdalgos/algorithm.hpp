@@ -120,7 +120,11 @@ struct is_execution_property<ExecutionPolicy> : std::true_type {};
 
 // TODO: This is an attempt at a lightweight property mechanism for
 // schedulers. This can probably take many forms. The important thing is that
-// they can be required on schedulers/parallel algorithm call sitesV
+// they can be required on schedulers/parallel algorithm call sites.
+//
+// Open questions:
+// - open or closed set of properties? (most likely open)
+// - if open, should missing properties be errors or not?
 struct with_execution_property_t {
   // All properties that have a customization for the given scheduler are
   // applied.
@@ -180,6 +184,19 @@ auto with_execution_properties(Scheduler const &sched,
 struct for_each_t {
   // TODO: What is the basis set? What are the fundamental overloads? This is
   // currently a bit too free-form...
+  //
+  // synchronous overloads:
+  // - existing: nothing
+  // - existing: execution policy
+  //
+  // - new: execution properties on their own? (apply to system scheduler?)
+  // - new: scheduler? (basis)
+  //
+  // asynchronous overloads:
+  // - new: nothing (equivalent to passing get_completion_scheduler if one exists, otherwise system scheduler?)
+  // - new: execution policy? (local override for the current algorithm only? special case of one single execution property, gets applied to get_completion_scheduler if exists, otherwise system scheduler?)
+  // - new: execution properties? (local overrides for the current algorithm only? generalization of the above, gets applied to get_completion_scheduler if exists, otherwise system scheduler?)
+  // - new: scheduler? (basis)
 
   // Synchronous overloads
 
@@ -305,12 +322,14 @@ struct for_each_t {
           });
     }
   }
-
-  // The following don't necessarily have to be specified, but it must be
-  // possible to use the same principles for them in the future.
-  // TODO: Ranges overloads?
-  // TODO: std::linalg overloads?
 };
+
+// The following don't necessarily have to be specified, but it must be possible
+// to use the same principles for them in the future.
+// TODO: Ranges overloads?
+// TODO: std::linalg overloads?
+// TODO: Delegation from one algorithm to another? Guarantee or allow? What
+// about compile-times?
 } // namespace detail
 
 using detail::execution_properties;
