@@ -197,6 +197,39 @@ struct for_each_t {
   // - new: execution policy? (local override for the current algorithm only? special case of one single execution property, gets applied to get_completion_scheduler if exists, otherwise system scheduler?)
   // - new: execution properties? (local overrides for the current algorithm only? generalization of the above, gets applied to get_completion_scheduler if exists, otherwise system scheduler?)
   // - new: scheduler? (basis)
+  //
+  // The following lists a possible customization hierarchy. algo() mark
+  // forwarding calls to the algorithm itself. [...] mark customizations. This
+  // doesn't quite make full sense yet.
+  // - Does the order make sense?
+  // - Are the system_scheduler fallbacks necessary?
+  // - Are so many levels necessary? Can some levels be left out to keep things simple?
+  // - Can the policy and properties overloads be collapsed (they're essentially the same)?
+  // - Do the property/policy-less overloads default to seq or use some default from scheduler?
+  //
+  // 1. algo(f, ...) -> for_each(seq, f, ...) [not customizable]
+  // 2. algo(policy, f, ...) -> algo(properties(policy), f, ...) [not customizable]
+  // 3. algo(properties, f, ...) -> algo(with(system_scheduler, properties), f, ...) [not customizable]
+  // 4. [this is P2500] algo(scheduler, f, ...) -> [scheduler customization] or
+  //                                               sync_wait(algo(scheduler, f, just(...)))
+  // 5. algo(sender, f) -> [completion_scheduler(sender) customization] or
+  //                       [sender customization (with properties(seq)?)] or
+  //                       algo(completion_scheduler(sender), sender, f) or
+  //                       algo(system_scheduler, f, sender)
+  // 6. algo(sender, policy, f) -> algo(sender, properties(policy), f) [not customizable]
+  // 7. algo(sender, properties, f) -> [with(completion_scheduler(sender), properties) customization] or
+  //                                   [sender customization] or
+  //                                   algo(with(completion_scheduler(sender), properties), sender, f) or
+  //                                   algo(with(system_scheduler, properties), sender, f)
+  // 8. algo(scheduler, sender, f) -> [scheduler customization] or
+  //                                  [sender customization] or
+  //                                  default implementation
+  //
+  // The above exposes three customization points, which are used in this order
+  // (though not all are applicable in all situations):
+  // 1. tag_invoke(algo_t, scheduler, f, ...)
+  // 2. tag_invoke(algo_t, scheduler, sender, additional_properties, f)
+  // 3. tag_invoke(algo_t, sender, additional_properties, f)
 
   // Synchronous overloads
 
