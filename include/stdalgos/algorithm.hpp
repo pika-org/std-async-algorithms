@@ -12,6 +12,15 @@
 // TODO: Where and how do execution_policy constraints get applied?
 //
 // TODO: Are other hints/properties required besides seq/par/par_unseq?
+// algorithms/bulk:
+// - chunk size (HPX, Kokkos)
+// - light/heavy i.e. work size (Kokkos)
+// - schedule i.e. work-stealing, static distribution, round-robin etc. (HPX, Kokkos)
+//
+// generic
+// - priorities
+// - stack size
+// - affinity
 //
 // TODO: Some schedulers can provide only maximum seq, no par. Other schedulers
 // can provide only par/par_unseq, no seq (is this true? can use various
