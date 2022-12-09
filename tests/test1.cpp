@@ -29,19 +29,30 @@ int main() {
   stdalgos::for_each(stdalgos::with_execution_property(sched, std::execution::seq), v.begin(),
                      v.end(), [](int x) { std::cerr << "x = " << x << '\n'; });
 
-  stdexec::this_thread::sync_wait(stdalgos::for_each(
-      stdexec::just(v.begin(), v.end()), [](int x) { std::cerr << "x = " << x << '\n'; }));
+  {
+    auto s = stdexec::just(v.begin(), v.end()) |
+             stdalgos::for_each([](int x) { std::cerr << "x = " << x << '\n'; });
+    stdexec::this_thread::sync_wait(std::move(s));
+  }
 
-  stdexec::this_thread::sync_wait(stdalgos::for_each(
-      stdexec::just(v.begin(), v.end()), stdalgos::make_execution_properties(std::execution::par),
-      [](int x) { std::cerr << "x = " << x << '\n'; }));
+  {
+    auto s = stdexec::just(v.begin(), v.end()) |
+             stdalgos::for_each(stdalgos::make_execution_properties(std::execution::par),
+                                [](int x) { std::cerr << "x = " << x << '\n'; });
+    stdexec::this_thread::sync_wait(std::move(s));
+  }
 
-  stdexec::this_thread::sync_wait(
-      stdexec::just(v.begin(), v.end()) |
-      exec::on(sched, stdalgos::for_each([](int x) { std::cerr << "x = " << x << '\n'; })));
+  {
+    auto s = stdexec::just(v.begin(), v.end()) |
+             exec::on(sched, stdalgos::for_each([](int x) { std::cerr << "x = " << x << '\n'; }));
+    stdexec::this_thread::sync_wait(std::move(s));
+  }
 
-  stdexec::this_thread::sync_wait(
-      stdexec::just(v.begin(), v.end()) |
-      exec::on(sched, stdalgos::for_each(stdalgos::make_execution_properties(std::execution::par),
-                                         [](int x) { std::cerr << "x = " << x << '\n'; })));
+  {
+    auto s =
+        stdexec::just(v.begin(), v.end()) |
+        exec::on(sched, stdalgos::for_each(stdalgos::make_execution_properties(std::execution::par),
+                                           [](int x) { std::cerr << "x = " << x << '\n'; }));
+    stdexec::this_thread::sync_wait(std::move(s));
+  }
 }
