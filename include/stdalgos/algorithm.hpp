@@ -9,6 +9,9 @@
 // TODO: Should the callable be sent by the sender or provided immediately?
 // Precedent: then takes f immediately, the value by sender.
 //
+// TODO: Should shapes be sent by the sender or provided immediately?
+// Precedent: bulk takes the shape directly, additional data by sender
+//
 // TODO: Where and how do execution_policy constraints get applied?
 //
 // TODO: Are other hints/properties required besides seq/par/par_unseq?
@@ -376,6 +379,16 @@ struct for_each_t {
                                                        f = std::move(f)](auto i) { f(b[i]); });
           });
     }
+  }
+
+  template <typename F, typename... Properties>
+  stdexec::__binder_back<for_each_t, execution_properties<Properties...>, F>
+  operator()(execution_properties<Properties...> const &exec_properties, F &&f) const {
+    return {{}, {}, {exec_properties, std::forward<F>(f)}};
+  }
+
+  template <typename F> stdexec::__binder_back<for_each_t, F> operator()(F &&f) const {
+    return {{}, {}, {std::forward<F>(f)}};
   }
 };
 

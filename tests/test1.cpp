@@ -1,5 +1,6 @@
 // TODO: License and copyright
 
+#include <exec/on.hpp>
 #include <exec/static_thread_pool.hpp>
 #include <execution>
 #include <iostream>
@@ -35,13 +36,12 @@ int main() {
       stdexec::just(v.begin(), v.end()), stdalgos::make_execution_properties(std::execution::par),
       [](int x) { std::cerr << "x = " << x << '\n'; }));
 
-  // NOTE: These don't work yet. for_each is not a sender adaptor closure.
-  // stdexec::this_thread::sync_wait(
-  //     stdexec::just(v.begin(), v.end()) |
-  //     exec::on(sched, stdalgos::for_each([](int x) { std::cerr << "x = " << x << '\n'; })));
+  stdexec::this_thread::sync_wait(
+      stdexec::just(v.begin(), v.end()) |
+      exec::on(sched, stdalgos::for_each([](int x) { std::cerr << "x = " << x << '\n'; })));
 
-  // stdexec::this_thread::sync_wait(
-  //     stdexec::just(v.begin(), v.end()) |
-  //     exec::on(stdalgos::for_each(stdalgos::make_execution_properties(std::execution::par),
-  //                                 [](int x) { std::cerr << "x = " << x << '\n'; })));
+  stdexec::this_thread::sync_wait(
+      stdexec::just(v.begin(), v.end()) |
+      exec::on(sched, stdalgos::for_each(stdalgos::make_execution_properties(std::execution::par),
+                                         [](int x) { std::cerr << "x = " << x << '\n'; })));
 }
