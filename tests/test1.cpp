@@ -13,12 +13,35 @@ int main() {
   auto p = std::execution::par;
 
   std::vector<int> v{1, 2, 3};
+
   // TODO: It should be possible to pass a plain execution_policy without
   // explicitly wrapping it in execution_properties.
-  stdexec::this_thread::sync_wait(stdalgos::for_each(
-      stdalgos::make_execution_properties(std::execution::par), stdexec::just(v.begin(), v.end()),
-      [](int x) { std::cerr << "x = " << x << '\n'; }));
+
+  stdalgos::for_each(v.begin(), v.end(), [](int x) { std::cerr << "x = " << x << '\n'; });
+
+  stdalgos::for_each(stdalgos::make_execution_properties(std::execution::par), v.begin(), v.end(),
+                     [](int x) { std::cerr << "x = " << x << '\n'; });
+
+  stdalgos::for_each(sched, v.begin(), v.end(), [](int x) { std::cerr << "x = " << x << '\n'; });
+
+  // NOTE: seq isn't actually taken into account at the moment
+  stdalgos::for_each(stdalgos::with_execution_property(sched, std::execution::seq), v.begin(),
+                     v.end(), [](int x) { std::cerr << "x = " << x << '\n'; });
 
   stdexec::this_thread::sync_wait(stdalgos::for_each(
       stdexec::just(v.begin(), v.end()), [](int x) { std::cerr << "x = " << x << '\n'; }));
+
+  stdexec::this_thread::sync_wait(stdalgos::for_each(
+      stdexec::just(v.begin(), v.end()), stdalgos::make_execution_properties(std::execution::par),
+      [](int x) { std::cerr << "x = " << x << '\n'; }));
+
+  // NOTE: These don't work yet. for_each is not a sender adaptor closure.
+  // stdexec::this_thread::sync_wait(
+  //     stdexec::just(v.begin(), v.end()) |
+  //     exec::on(sched, stdalgos::for_each([](int x) { std::cerr << "x = " << x << '\n'; })));
+
+  // stdexec::this_thread::sync_wait(
+  //     stdexec::just(v.begin(), v.end()) |
+  //     exec::on(stdalgos::for_each(stdalgos::make_execution_properties(std::execution::par),
+  //                                 [](int x) { std::cerr << "x = " << x << '\n'; })));
 }

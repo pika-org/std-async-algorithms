@@ -177,16 +177,18 @@ struct with_execution_property_t {
         with_execution_property_t{}(sched, std::forward<ExecutionProperty0>(exec_property0)),
         std::forward<Rest>(rest)...);
   };
+
+  auto operator()(stdexec::scheduler auto const &sched) const { return sched; };
 };
+
+inline constexpr with_execution_property_t with_execution_property{};
 
 // TODO: forwarding/moving/const/ref is not consistent.
 template <stdexec::scheduler Scheduler, typename... Properties>
 auto with_execution_properties(Scheduler const &sched,
                                execution_properties<Properties...> exec_properties) {
   return std::apply(
-      [&](auto &&...p) {
-        return with_execution_properties(sched, std::forward<decltype(p)>(p)...);
-      },
+      [&](auto &&...p) { return with_execution_property(sched, std::forward<decltype(p)>(p)...); },
       std::move(exec_properties.properties));
 }
 
@@ -202,9 +204,13 @@ struct for_each_t {
   // - new: scheduler? (basis)
   //
   // asynchronous overloads:
-  // - new: nothing (equivalent to passing get_completion_scheduler if one exists, otherwise system scheduler?)
-  // - new: execution policy? (local override for the current algorithm only? special case of one single execution property, gets applied to get_completion_scheduler if exists, otherwise system scheduler?)
-  // - new: execution properties? (local overrides for the current algorithm only? generalization of the above, gets applied to get_completion_scheduler if exists, otherwise system scheduler?)
+  // - new: nothing (equivalent to passing get_completion_scheduler if one exists, otherwise system
+  // scheduler?)
+  // - new: execution policy? (local override for the current algorithm only? special case of one
+  // single execution property, gets applied to get_completion_scheduler if exists, otherwise system
+  // scheduler?)
+  // - new: execution properties? (local overrides for the current algorithm only? generalization of
+  // the above, gets applied to get_completion_scheduler if exists, otherwise system scheduler?)
   // - new: scheduler? (basis)
   //
   // The following lists a possible customization hierarchy. algo() mark
@@ -221,14 +227,20 @@ struct for_each_t {
   //   P2300 changes how schedulers are taken into account (through senders or
   //   receivers).
   //
-  // 1. algo(f, ...) -> algo(properties(), f, ...) or algo(system_scheduler, f, ...) [not customizable]
-  // 2. algo(properties, f, ...) -> algo(with(system_scheduler, properties), f, ...) [not customizable]
+  // 1. algo(f, ...) -> algo(properties(), f, ...) or algo(system_scheduler, f, ...) [not
+  // customizable]
+  // 2. algo(properties, f, ...) -> algo(with(system_scheduler, properties), f, ...) [not
+  // customizable]
   // 3. [this is P2500] algo(scheduler, f, ...) -> [scheduler customization 1.] or
-  //                                               sync_wait(just(...) | on(scheduler, algo(f))
+  //                                               sync_wait(just(...) | on(scheduler, algo(f)) or
+  //                                               sync_wait(transfer_just(scheduler, ...) |
+  //                                               algo(f))
   // 4. algo(sender, f) -> algo(sender, properties(), f)
-  // 5. algo(sender, properties, f) -> [with(completion_scheduler(sender), properties) customization 2.] or
+  // 5. algo(sender, properties, f) -> [with(completion_scheduler(sender), properties)
+  // customization 2.] or
   //                                   [sender customization 3.] or
-  //                                   [default implementation: look at this carefully to make sure execution policy requirements are not violated]
+  //                                   [default implementation: look at this carefully to make sure
+  //                                   execution policy requirements are not violated]
   //
   // The above exposes three customization points, which are used in this order
   // (though not all are applicable in all situations):
@@ -237,6 +249,24 @@ struct for_each_t {
   // 3. tag_invoke(algo_t, sender, properties, f) [asynchronous]
 
   // Synchronous overloads
+
+  template <typename It, typename F> void operator()(It b, It e, F &&f) const {
+    // Fall back to synchronizing the asynchronous overload if no synchronous
+    // customization is available.
+    for_each_t{}(execution_properties{}, b, e, std::forward<F>(f));
+  }
+
+  // This should be identical to the existing for_each(exec_policy, ...)
+  // overload in std. Included only for completeness. This is not meant to be
+  // customized. It should fall back to the very default implementation.
+  template <typename It, typename F, typename... Properties>
+  void operator()(execution_properties<Properties...> const &exec_properties, It b, It e,
+                  F &&f) const {
+    // Fall back to synchronizing the asynchronous overload if no synchronous
+    // customization is available.
+    stdexec::this_thread::sync_wait(
+        for_each_t{}(stdexec::just(b, e), exec_properties, std::forward<F>(f)));
+  }
 
   // Overload with scheduler and tag_invoke customization: This exists to allow
   // optimizing the synchronous case. In most cases it should not be necessary
@@ -266,55 +296,42 @@ struct for_each_t {
         stdexec::transfer_just(std::forward<Scheduler>(sched), b, e), std::forward<F>(f)));
   }
 
-  // This should be identical to the existing for_each(exec_policy, ...)
-  // overload in std. Included only for completeness. This is not meant to be
-  // customized. It should fall back to the very default implementation.
-  template <execution_policy ExecutionPolicy, typename It, typename F>
-  void operator()(ExecutionPolicy &&exec_policy, It b, It e, F &&f) const {
-    // Fall back to synchronizing the asynchronous overload if no synchronous
-    // customization is available.
-    stdexec::this_thread::sync_wait(
-        for_each_t{}(make_execution_properties(std::forward<ExecutionPolicy>(exec_policy)),
-                     stdexec::just(b, e), std::forward<F>(f)));
-  }
-
   // Asynchronous overloads
+
+  // Use empty execution properties by default, forward to other overloads
+  template <stdexec::sender Sender, typename F>
+  stdexec::sender auto operator()(Sender &&sender, F &&f) const {
+    return for_each_t{}(std::forward<Sender>(sender), execution_properties<>{}, std::forward<F>(f));
+  }
 
   // Overload when there is a tag_invoke overload and a completion scheduler
   // from the sender.
-  template <stdexec::sender Sender, typename F>
+  template <stdexec::sender Sender, typename F, typename... Properties>
   requires
       // clang-format off
       (stdexec::__tag_invocable_with_completion_scheduler<for_each_t, stdexec::set_value_t, Sender, F>)
       // clang-format on
       stdexec::sender auto
-      operator()(Sender &&sender, F &&f) const {
-    return stdexec::tag_invoke(stdexec::get_completion_scheduler<stdexec::set_value_t>(sender),
-                               std::forward<Sender>(sender), std::forward<F>(f));
+      operator()(Sender &&sender, execution_properties<Properties...> const &exec_properties,
+                 F &&f) const {
+    // TODO: Can with_execution_properties change the scheduler type?
+    return stdexec::tag_invoke(
+        with_execution_properties(stdexec::get_completion_scheduler<stdexec::set_value_t>(sender),
+                                  exec_properties),
+        std::forward<Sender>(sender), std::forward<F>(f));
   }
 
   // Sender customization
-  template <stdexec::sender Sender, typename F>
+  template <stdexec::sender Sender, typename F, typename... Properties>
   requires
       // clang-format off
       (!stdexec::__tag_invocable_with_completion_scheduler<for_each_t, stdexec::set_value_t, Sender, F>) &&
-      (stdexec::tag_invocable<for_each_t, Sender, F>)
+      (stdexec::tag_invocable<for_each_t, Sender, execution_properties<Properties...> const&, F>)
       // clang-format on
       stdexec::sender auto
-      operator()(Sender &&sender, F &&f) const {
-    return stdexec::tag_invoke(std::forward<Sender>(sender), std::forward<F>(f));
-  }
-
-  // Forward to default implementation with default execution properties
-  template <stdexec::sender Sender, typename F>
-  requires
-      // clang-format off
-      (!stdexec::__tag_invocable_with_completion_scheduler<for_each_t, stdexec::set_value_t, Sender, F>) &&
-      (!stdexec::tag_invocable<for_each_t, Sender, F>)
-      // clang-format on
-      stdexec::sender auto
-      operator()(Sender &&sender, F &&f) const {
-    return for_each_t{}(execution_properties<>{}, std::forward<Sender>(sender), std::forward<F>(f));
+      operator()(Sender &&sender, execution_properties<Properties...> const &exec_properties,
+                 F &&f) const {
+    return stdexec::tag_invoke(std::forward<Sender>(sender), exec_properties, std::forward<F>(f));
   }
 
   // Default implementation
@@ -322,10 +339,10 @@ struct for_each_t {
   requires
       // clang-format off
       (!stdexec::__tag_invocable_with_completion_scheduler<for_each_t, stdexec::set_value_t, Sender, F>) &&
-      (!stdexec::tag_invocable<for_each_t, Sender, F>)
+      (!stdexec::tag_invocable<for_each_t, Sender, execution_properties<Properties...> const&, F>)
       // clang-format on
       stdexec::sender auto
-      operator()(execution_properties<Properties...> const &exec_properties, Sender &&sender,
+      operator()(Sender &&sender, execution_properties<Properties...> const &exec_properties,
                  F &&f) const {
     // TODO: Should a (completion) scheduler be required?
     if constexpr (stdexec::__has_completion_scheduler<Sender, stdexec::set_value_t>) {
@@ -372,6 +389,7 @@ struct for_each_t {
 
 using detail::execution_properties;
 using detail::make_execution_properties;
+using detail::with_execution_property;
 
 using for_each_t = detail::for_each_t;
 inline constexpr for_each_t for_each{};
