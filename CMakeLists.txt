@@ -1,3 +1,11 @@
+# std-async-algorithms
+#
+# Copyright (c) 2021-2022, ETH Zurich
+# All rights reserved.
+#
+# Please, refer to the LICENSE file in the root directory.
+# SPDX-License-Identifier: BSD-3-Clause
+
 cmake_minimum_required(VERSION 3.22)
 
 project(std-async-algorithms CXX)
