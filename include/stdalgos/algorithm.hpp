@@ -1,5 +1,11 @@
-// TODO: License and copyright
+// std-async-algorithms
 //
+// Copyright (c) 2021-2022, ETH Zurich
+// All rights reserved.
+//
+// Please, refer to the LICENSE file in the root directory.
+// SPDX-License-Identifier: BSD-3-Clause
+
 // Requirements:
 // - must be able to use scheduler from environment (whether
 //   get_completion_scheduler or through some connect-mechanism)
