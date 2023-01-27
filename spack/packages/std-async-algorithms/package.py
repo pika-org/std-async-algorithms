@@ -19,5 +19,5 @@ class StdAsyncAlgorithms(CMakePackage):
 
     depends_on("cmake@3.22:", type="build")
 
-    depends_on("stdexec")
+    depends_on("stdexec@c0fe16f451137b00ceb85d912ec3a288990ce766")
     depends_on("pika +p2300", when="+pika")
