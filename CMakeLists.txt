@@ -22,11 +22,18 @@ target_link_libraries(std_async_algorithms INTERFACE STDEXEC::stdexec)
 option(STD_ASYNC_ALGORITHMS_WITH_TESTS "Enable tests" OFF)
 
 if(STD_ASYNC_ALGORITHMS_WITH_TESTS)
+
+  function(add_algo_test name)
+    add_executable(${name}_test tests/${name}.cpp)
+    target_link_libraries(${name}_test PRIVATE std_async_algorithms $<TARGET_NAME_IF_EXISTS:pika::pika>)
+    target_compile_definitions(${name}_test PRIVATE $<$<TARGET_EXISTS:pika::pika>:STD_ASYNC_ALGOS_HAVE_PIKA>)
+    add_test(NAME ${name} COMMAND ${name}_test)
+  endfunction()
+
   enable_testing()
   include(CTest)
 
-  add_executable(for_each_test tests/for_each.cpp)
-  target_link_libraries(for_each_test PRIVATE std_async_algorithms $<TARGET_NAME_IF_EXISTS:pika::pika>)
-  target_compile_definitions(for_each_test PRIVATE $<$<TARGET_EXISTS:pika::pika>:STD_ASYNC_ALGOS_HAVE_PIKA>)
-  add_test(NAME for_each COMMAND for_each_test)
+  add_algo_test(for_each)
+  add_algo_test(merge)
+
 endif()

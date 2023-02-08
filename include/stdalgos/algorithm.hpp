@@ -9,3 +9,4 @@
 #pragma once
 
 #include <stdalgos/detail/for_each.hpp>
+#include <stdalgos/detail/merge.hpp>
