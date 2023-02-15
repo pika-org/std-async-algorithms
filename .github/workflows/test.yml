@@ -49,7 +49,7 @@ jobs:
     - name: Check out std-async-algorithms
       uses: actions/checkout@v3
     - name: Configure std-async-algorithms
-      run: cmake . -Bbuild -GNinja -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+      run: cmake . -Bbuild -GNinja -DSTD_ASYNC_ALGORITHMS_WITH_TESTS=ON -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
     - name: Build std-async-algorithms
       run: cmake --build build --target all
     - name: Test std-async-algorithms
