@@ -10,8 +10,6 @@ cmake_minimum_required(VERSION 3.22)
 
 project(std-async-algorithms CXX)
 
-# TODO: This is missing from STDEXEC's config file.
-find_package(Threads REQUIRED)
 find_package(STDEXEC REQUIRED)
 find_package(pika)
 
