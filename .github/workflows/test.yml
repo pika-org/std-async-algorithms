@@ -1,0 +1,57 @@
+# Copyright (c) 2023 ETH Zurich
+#
+# SPDX-License-Identifier: BSL-1.0
+# Distributed under the Boost Software License, Version 1.0. (See accompanying
+# file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
+
+name: Linux
+
+on:
+  push:
+    branches:
+      - main
+      - release**
+  pull_request:
+    branches:
+      - main
+      - release**
+
+jobs:
+  build:
+    name: linux
+    runs-on: ubuntu-latest
+
+    steps:
+    # Set up environment
+    - name: Update apt repositories for ccache
+      run: sudo apt update
+    - name: Setup ccache
+      uses: hendrikmuhs/ccache-action@v1.2
+      with:
+        key: ccache-linux
+    - name: Install tools
+      run: sudo apt install -y cmake gcc ninja-build
+
+    # Install stdexec
+    - name: Check out stdexec
+      uses: actions/checkout@v3
+      with:
+        repository: NVIDIA/stdexec
+        ref: f4c9aff7aca8e811318785d4c9d581afe54a04a7
+        path: stdexec
+    - name: Install stdexec
+      working-directory: stdexec
+      run: |
+          cmake . -Bbuild -GNinja -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+          sudo cmake --build build --target install
+
+    # Build and test std-async-algorithms
+    - name: Check out std-async-algorithms
+      uses: actions/checkout@v3
+    - name: Configure std-async-algorithms
+      run: cmake . -Bbuild -GNinja -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+    - name: Build std-async-algorithms
+      run: cmake --build build --target all
+    - name: Test std-async-algorithms
+      working-directory: build
+      run: ctest --output-on-failure
