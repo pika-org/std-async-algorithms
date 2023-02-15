@@ -21,7 +21,7 @@
 #include <pika/init.hpp>
 #endif
 
-bool constexpr print = true;
+bool constexpr print = false;
 
 template <typename T>
 void check_identical(std::vector<T> &v1, std::vector<T> &v2)
@@ -57,6 +57,46 @@ int main(int argc, char *argv[]) {
 
     stdalgos::merge(v1.begin(), v1.end(), v2.begin(), v2.end(), std::back_inserter(dst));
     check_identical(dst, dst_check);
-  }
+    dst.clear();
 
+    stdalgos::merge(stdalgos::make_execution_properties(std::execution::par),
+        v1.begin(), v1.end(), v2.begin(), v2.end(), std::back_inserter(dst));
+    check_identical(dst, dst_check);
+    dst.clear();
+
+    stdalgos::merge(sched, v1.begin(), v1.end(), v2.begin(), v2.end(),
+        std::back_inserter(dst));
+    check_identical(dst, dst_check);
+    dst.clear();
+
+    // NOTE: seq isn't actually taken into account at the moment
+    stdalgos::merge(stdalgos::with_execution_property(sched, std::execution::seq),
+            v1.begin(), v1.end(), v2.begin(), v2.end(), std::back_inserter(dst));
+    check_identical(dst, dst_check);
+    dst.clear();
+
+    {
+        auto s = stdexec::just(v1.begin(), v1.end(), v2.begin(), v2.end(), std::back_inserter(dst)) |
+               stdalgos::merge();
+        stdexec::this_thread::sync_wait(std::move(s));
+        check_identical(dst, dst_check);
+        dst.clear();
+    }
+
+    {
+        auto s = stdexec::just(v1.begin(), v1.end(), v2.begin(), v2.end(), std::back_inserter(dst)) |
+                 stdalgos::merge(stdalgos::make_execution_properties(std::execution::par));
+        stdexec::this_thread::sync_wait(std::move(s));
+        check_identical(dst, dst_check);
+        dst.clear();
+    }
+
+    {
+        auto s = stdexec::just(v1.begin(), v1.end(), v2.begin(), v2.end(), std::back_inserter(dst)) |
+                 exec::on(sched, stdalgos::merge());
+        stdexec::this_thread::sync_wait(std::move(s));
+        check_identical(dst, dst_check);
+        dst.clear();
+    }
+  }
 }
