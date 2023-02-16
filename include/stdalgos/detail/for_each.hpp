@@ -85,7 +85,7 @@ struct for_each_t {
                  F &&f) const {
     // TODO: Can with_execution_properties change the scheduler type?
     return stdexec::tag_invoke(
-        with_execution_properties(stdexec::get_completion_scheduler<stdexec::set_value_t>(sender),
+        with_execution_properties(stdexec::get_completion_scheduler<stdexec::set_value_t>(stdexec::get_env(sender)),
                                   exec_properties),
         std::forward<Sender>(sender), std::forward<F>(f));
   }
@@ -116,7 +116,7 @@ struct for_each_t {
     // TODO: Should a (completion) scheduler be required?
     if constexpr (stdexec::__has_completion_scheduler<Sender, stdexec::set_value_t>) {
       stdexec::scheduler auto sched =
-          stdexec::get_completion_scheduler<stdexec::set_value_t>(sender);
+          stdexec::get_completion_scheduler<stdexec::set_value_t>(stdexec::get_env(sender));
       return stdexec::let_value(
           std::forward<Sender>(sender),
           [f = std::forward<F>(f), sched = std::move(sched), exec_properties](auto &b, auto &e) {
