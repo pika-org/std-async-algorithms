@@ -85,6 +85,8 @@ struct merge_t {
     if constexpr (stdexec::__has_completion_scheduler<Sender, stdexec::set_value_t>) {
       stdexec::scheduler auto sched =
           stdexec::get_completion_scheduler<stdexec::set_value_t>(stdexec::get_env(sender));
+      // TODO: remove the let_value, once the problem of chaining two transfers is
+      // solved in stdexec
       return stdexec::let_value(
           std::forward<Sender>(sender), [sched = std::move(sched), exec_properties]
             (auto &b1, auto &e1, auto&b2, auto &e2, auto &d)
@@ -122,9 +124,8 @@ struct merge_t {
       // execution policy or properties to.
       // TODO: Should this fall back to the system_context scheduler? Possibly
       // yes, especially if the execution policy is par.
-      return stdexec::let_value(
-          std::forward<Sender>(sender), [](auto &b1, auto &e1, auto &b2, auto& e2, auto& d) {
-            return stdexec::just() | stdexec::then([b1 = std::move(b1), e1 = std::move(e1), b2 = std::move(b2), e2 = std::move(e2), d = std::move(d)]() mutable
+      return std::forward<Sender>(sender) |
+          stdexec::then([](auto b1, auto e1, auto b2, auto e2, auto d) mutable
                 {
                     while(b1 != e1)
                     {
@@ -145,7 +146,6 @@ struct merge_t {
                     return std::move(d);
                 }
             );
-        });
     }
     }
 
