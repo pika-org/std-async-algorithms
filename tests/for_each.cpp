@@ -101,6 +101,5 @@ int main(int argc, char *argv[]) {
     pika::finalize();
     pika::stop();
   }
-
 #endif
 }
