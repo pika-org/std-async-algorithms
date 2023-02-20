@@ -15,6 +15,29 @@
 namespace stdalgos {
 namespace merge_detail {
 
+template <typename InputIt1, typename InputIt2, typename OutputIt>
+OutputIt merge_impl(InputIt1 b1, InputIt1 e1, InputIt2 b2, InputIt2 e2, OutputIt d)
+{
+    while(b1 != e1)
+    {
+        if (*b2 < *b1)
+        {
+            d = *b2; // equivalent: *d++ = *b2;
+            ++b2;
+        }
+        else {
+            d = *b1; // equivalent: *d++ = *b1;
+            ++b1;
+        }
+        if(b2 == e2)
+            std::copy(b1, e1, d);
+    }
+    if(b1 == e1)
+        std::copy(b2, e2, d);
+    return d;
+
+}
+
 struct merge_t {
   // Synchronous overloads
 
@@ -89,33 +112,16 @@ struct merge_t {
       // solved in stdexec
       return stdexec::let_value(
           std::forward<Sender>(sender), [sched = std::move(sched), exec_properties]
-            (auto &b1, auto &e1, auto&b2, auto &e2, auto &d)
+            (auto b1, auto e1, auto b2, auto e2, auto d)
             {
                 // TODO: This could use something a bit nicer.
                 stdexec::scheduler auto sched_with_properties =
                     with_execution_properties(sched, exec_properties);
 
                 return stdexec::schedule(std::move(sched)) |
-                    stdexec::then([b1 = std::move(b1), e1 = std::move(e1),
-                        b2 = std::move(b2), e2 = std::move(e2), d = std::move(d)]() mutable
+                    stdexec::then([=]() mutable
                     {
-                        while(b1 != e1)
-                        {
-                            if (*b2 < *b1)
-                            {
-                                d = *b2; // equivalent: *d++ = *b2;
-                                ++b2;
-                            }
-                            else {
-                                d = *b1; // equivalent: *d++ = *b1;
-                                ++b1;
-                            }
-                            if(b2 == e2)
-                                std::copy(b1, e1, d);
-                        }
-                        if(b1 == e1)
-                            std::copy(b2, e2, d);
-                        return std::move(d);
+                        return merge_impl(b1, e1, b2, e2, d);
                     }
                 );
           });
@@ -127,23 +133,7 @@ struct merge_t {
       return std::forward<Sender>(sender) |
           stdexec::then([](auto b1, auto e1, auto b2, auto e2, auto d) mutable
                 {
-                    while(b1 != e1)
-                    {
-                        if (*b2 < *b1)
-                        {
-                            d = *b2; // equivalent: *d++ = *b2;
-                            ++b2;
-                        }
-                        else {
-                            d = *b1; // equivalent: *d++ = *b1;
-                            ++b1;
-                        }
-                        if(b2 == e2)
-                            std::copy(b1, e1, d);
-                    }
-                    if(b1 == e1)
-                        std::copy(b2, e2, d);
-                    return std::move(d);
+                    return merge_impl(b1, e1, b2, e2, d);
                 }
             );
     }
