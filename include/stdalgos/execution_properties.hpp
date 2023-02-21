@@ -24,8 +24,7 @@ namespace stdalgos {
         concept execution_property = is_execution_property<P>::value;
 
         template <typename... Properties>
-        requires(
-            execution_property<Properties>&&...) struct execution_properties
+        requires(execution_property<Properties>&&...) struct execution_properties
         {
             std::tuple<std::decay_t<Properties>...> properties;
         };
@@ -38,12 +37,10 @@ namespace stdalgos {
         }
 
         template <typename ExecutionPolicy>
-        concept execution_policy = std::same_as<std::decay_t<ExecutionPolicy>,
-            std::execution::sequenced_policy> ||
-            std::same_as<std::decay_t<ExecutionPolicy>,
-                std::execution::unsequenced_policy> ||
-            std::same_as<std::decay_t<ExecutionPolicy>,
-                std::execution::parallel_policy> ||
+        concept execution_policy =
+            std::same_as<std::decay_t<ExecutionPolicy>, std::execution::sequenced_policy> ||
+            std::same_as<std::decay_t<ExecutionPolicy>, std::execution::unsequenced_policy> ||
+            std::same_as<std::decay_t<ExecutionPolicy>, std::execution::parallel_policy> ||
             std::same_as<std::decay_t<ExecutionPolicy>,
                 std::execution::parallel_unsequenced_policy>;
 
@@ -63,15 +60,13 @@ namespace stdalgos {
         {
             // All properties that have a customization for the given scheduler are
             // applied.
-            template <stdexec::scheduler Scheduler,
-                execution_property ExecutionProperty>
+            template <stdexec::scheduler Scheduler, execution_property ExecutionProperty>
             requires
                 // clang-format off
                 (stdexec::tag_invocable<with_execution_property_t, Scheduler const &, ExecutionProperty>)
                 // clang-format on
                 auto
-                operator()(Scheduler const& sched,
-                    ExecutionProperty&& exec_property) const
+                operator()(Scheduler const& sched, ExecutionProperty&& exec_property) const
             {
                 return stdexec::tag_invoke(with_execution_property_t{}, sched,
                     std::forward<ExecutionProperty>(exec_property));
@@ -80,23 +75,20 @@ namespace stdalgos {
             // Custom properties that can't be applied to the given scheduler are ignored.
             // TODO: Is this wise? See prefer/require from the various properties
             // proposals.
-            template <stdexec::scheduler Scheduler,
-                execution_property ExecutionProperty>
+            template <stdexec::scheduler Scheduler, execution_property ExecutionProperty>
             requires
                 // clang-format off
                 (!stdexec::tag_invocable<with_execution_property_t, Scheduler const &, ExecutionProperty>)
                 // clang-format on
                 decltype(auto)
-                operator()(
-                    Scheduler&& sched, ExecutionProperty&& exec_property) const
+                operator()(Scheduler&& sched, ExecutionProperty&& exec_property) const
             {
                 return std::forward<Scheduler>(sched);
             }
 
             // TODO: Is an execution policy a required property of schedulers that are
             // passed to parallel algorithms?
-            template <stdexec::scheduler Scheduler,
-                execution_property ExecutionProperty0,
+            template <stdexec::scheduler Scheduler, execution_property ExecutionProperty0,
                 execution_property... Rest>
             requires
                 // clang-format off
@@ -107,8 +99,8 @@ namespace stdalgos {
                     ExecutionProperty0&& exec_property0, Rest&&... rest) const
             {
                 return with_execution_property_t{}(
-                    with_execution_property_t{}(sched,
-                        std::forward<ExecutionProperty0>(exec_property0)),
+                    with_execution_property_t{}(
+                        sched, std::forward<ExecutionProperty0>(exec_property0)),
                     std::forward<Rest>(rest)...);
             };
 
@@ -120,13 +112,12 @@ namespace stdalgos {
 
         // TODO: forwarding/moving/const/ref is not consistent.
         template <stdexec::scheduler Scheduler, typename... Properties>
-        auto with_execution_properties(Scheduler const& sched,
-            execution_properties<Properties...> exec_properties)
+        auto with_execution_properties(
+            Scheduler const& sched, execution_properties<Properties...> exec_properties)
         {
             return std::apply(
                 [&](auto&&... p) {
-                    return with_execution_property_t{}(
-                        sched, std::forward<decltype(p)>(p)...);
+                    return with_execution_property_t{}(sched, std::forward<decltype(p)>(p)...);
                 },
                 std::move(exec_properties.properties));
         }

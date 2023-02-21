@@ -55,3 +55,14 @@ jobs:
     - name: Test std-async-algorithms
       working-directory: build
       run: ctest --output-on-failure
+
+  formatting:
+    name: Formatting
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Check that C++ files are well clang-formatted
+      uses: jidicula/clang-format-action@v4.10.2
+      with:
+        clang-format-version: '14'
+        check-path: '.'
