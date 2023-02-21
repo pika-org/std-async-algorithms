@@ -21,64 +21,67 @@
 #include <pika/init.hpp>
 #endif
 
-int main(int argc, char *argv[]) {
-  std::vector<int> v1{1, 2, 3};
-  std::vector<int> v2{1, 2, 4, 5};
-  std::vector<int> dst;
-  std::vector<int> dst_check;
-
-  {
-    exec::static_thread_pool pool{2};
-    stdexec::scheduler auto sched = pool.get_scheduler();
-
-    // TODO: It should be possible to pass a plain execution_policy without
-    // explicitly wrapping it in execution_properties.
-
-    // Compute the reference result to compare results
-    std::merge(v1.begin(), v1.end(), v2.begin(), v2.end(), std::back_inserter(dst_check));
-
-    stdalgos::merge(v1.begin(), v1.end(), v2.begin(), v2.end(), std::back_inserter(dst));
-    assert(std::ranges::equal(dst, dst_check));
-    dst.clear();
-
-    stdalgos::merge(stdalgos::make_execution_properties(std::execution::par),
-        v1.begin(), v1.end(), v2.begin(), v2.end(), std::back_inserter(dst));
-    assert(std::ranges::equal(dst, dst_check));
-    dst.clear();
-
-    stdalgos::merge(sched, v1.begin(), v1.end(), v2.begin(), v2.end(),
-        std::back_inserter(dst));
-    assert(std::ranges::equal(dst, dst_check));
-    dst.clear();
-
-    // NOTE: seq isn't actually taken into account at the moment
-    stdalgos::merge(stdalgos::with_execution_property(sched, std::execution::seq),
-            v1.begin(), v1.end(), v2.begin(), v2.end(), std::back_inserter(dst));
-    assert(std::ranges::equal(dst, dst_check));
-    dst.clear();
+int main(int argc, char* argv[])
+{
+    std::vector<int> v1{1, 2, 3};
+    std::vector<int> v2{1, 2, 4, 5};
+    std::vector<int> dst;
+    std::vector<int> dst_check;
 
     {
-        auto s = stdexec::just(v1.begin(), v1.end(), v2.begin(), v2.end(), std::back_inserter(dst)) |
-               stdalgos::merge();
-        stdexec::this_thread::sync_wait(std::move(s));
-        assert(std::ranges::equal(dst, dst_check));
-        dst.clear();
-    }
+        exec::static_thread_pool pool{2};
+        stdexec::scheduler auto sched = pool.get_scheduler();
 
-    {
-        auto s = stdexec::just(v1.begin(), v1.end(), v2.begin(), v2.end(), std::back_inserter(dst)) |
-                 stdalgos::merge(stdalgos::make_execution_properties(std::execution::par));
-        stdexec::this_thread::sync_wait(std::move(s));
-        assert(std::ranges::equal(dst, dst_check));
-        dst.clear();
-    }
+        // TODO: It should be possible to pass a plain execution_policy without
+        // explicitly wrapping it in execution_properties.
 
-    {
-        auto s = stdexec::just(v1.begin(), v1.end(), v2.begin(), v2.end(), std::back_inserter(dst)) |
-                 exec::on(sched, stdalgos::merge());
-        stdexec::this_thread::sync_wait(std::move(s));
+        // Compute the reference result to compare results
+        std::merge(v1.begin(), v1.end(), v2.begin(), v2.end(), std::back_inserter(dst_check));
+
+        stdalgos::merge(v1.begin(), v1.end(), v2.begin(), v2.end(), std::back_inserter(dst));
         assert(std::ranges::equal(dst, dst_check));
         dst.clear();
+
+        stdalgos::merge(stdalgos::make_execution_properties(std::execution::par), v1.begin(),
+            v1.end(), v2.begin(), v2.end(), std::back_inserter(dst));
+        assert(std::ranges::equal(dst, dst_check));
+        dst.clear();
+
+        stdalgos::merge(sched, v1.begin(), v1.end(), v2.begin(), v2.end(), std::back_inserter(dst));
+        assert(std::ranges::equal(dst, dst_check));
+        dst.clear();
+
+        // NOTE: seq isn't actually taken into account at the moment
+        stdalgos::merge(stdalgos::with_execution_property(sched, std::execution::seq), v1.begin(),
+            v1.end(), v2.begin(), v2.end(), std::back_inserter(dst));
+        assert(std::ranges::equal(dst, dst_check));
+        dst.clear();
+
+        {
+            auto s =
+                stdexec::just(v1.begin(), v1.end(), v2.begin(), v2.end(), std::back_inserter(dst)) |
+                stdalgos::merge();
+            stdexec::this_thread::sync_wait(std::move(s));
+            assert(std::ranges::equal(dst, dst_check));
+            dst.clear();
+        }
+
+        {
+            auto s =
+                stdexec::just(v1.begin(), v1.end(), v2.begin(), v2.end(), std::back_inserter(dst)) |
+                stdalgos::merge(stdalgos::make_execution_properties(std::execution::par));
+            stdexec::this_thread::sync_wait(std::move(s));
+            assert(std::ranges::equal(dst, dst_check));
+            dst.clear();
+        }
+
+        {
+            auto s =
+                stdexec::just(v1.begin(), v1.end(), v2.begin(), v2.end(), std::back_inserter(dst)) |
+                exec::on(sched, stdalgos::merge());
+            stdexec::this_thread::sync_wait(std::move(s));
+            assert(std::ranges::equal(dst, dst_check));
+            dst.clear();
+        }
     }
-  }
 }
