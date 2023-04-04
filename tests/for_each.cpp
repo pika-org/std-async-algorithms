@@ -26,47 +26,22 @@ int main(int argc, char* argv[])
         exec::static_thread_pool pool{2};
         stdexec::scheduler auto sched = pool.get_scheduler();
 
-        // TODO: It should be possible to pass a plain execution_policy without
-        // explicitly wrapping it in execution_properties.
-
         stdalgos::for_each(v.begin(), v.end(), [](int x) { std::cerr << "x = " << x << '\n'; });
-
-        stdalgos::for_each(stdalgos::make_execution_properties(std::execution::par), v.begin(),
-            v.end(), [](int x) { std::cerr << "x = " << x << '\n'; });
 
         stdalgos::for_each(
             sched, v.begin(), v.end(), [](int x) { std::cerr << "x = " << x << '\n'; });
 
-        // NOTE: seq isn't actually taken into account at the moment
-        stdalgos::for_each(stdalgos::with_execution_property(sched, std::execution::seq), v.begin(),
-            v.end(), [](int x) { std::cerr << "x = " << x << '\n'; });
-
         {
             auto s = stdexec::just(v.begin(), v.end()) |
                 stdalgos::for_each([](int x) { std::cerr << "x = " << x << '\n'; });
-            stdexec::this_thread::sync_wait(std::move(s));
-        }
-
-        {
-            auto s = stdexec::just(v.begin(), v.end()) |
-                stdalgos::for_each(stdalgos::make_execution_properties(std::execution::par),
-                    [](int x) { std::cerr << "x = " << x << '\n'; });
-            stdexec::this_thread::sync_wait(std::move(s));
+            stdexec::sync_wait(std::move(s));
         }
 
         {
             auto s = stdexec::just(v.begin(), v.end()) |
                 exec::on(
                     sched, stdalgos::for_each([](int x) { std::cerr << "x = " << x << '\n'; }));
-            stdexec::this_thread::sync_wait(std::move(s));
-        }
-
-        {
-            auto s = stdexec::just(v.begin(), v.end()) |
-                exec::on(sched,
-                    stdalgos::for_each(stdalgos::make_execution_properties(std::execution::par),
-                        [](int x) { std::cerr << "x = " << x << '\n'; }));
-            stdexec::this_thread::sync_wait(std::move(s));
+            stdexec::sync_wait(std::move(s));
         }
     }
 
@@ -80,23 +55,11 @@ int main(int argc, char* argv[])
             stdalgos::for_each(
                 sched, v.begin(), v.end(), [](int x) { std::cerr << "x = " << x << '\n'; });
 
-            // NOTE: seq isn't actually taken into account at the moment
-            stdalgos::for_each(stdalgos::with_execution_property(sched, std::execution::seq),
-                v.begin(), v.end(), [](int x) { std::cerr << "x = " << x << '\n'; });
-
             {
                 auto s = stdexec::just(v.begin(), v.end()) |
                     exec::on(
                         sched, stdalgos::for_each([](int x) { std::cerr << "x = " << x << '\n'; }));
-                stdexec::this_thread::sync_wait(std::move(s));
-            }
-
-            {
-                auto s = stdexec::just(v.begin(), v.end()) |
-                    exec::on(sched,
-                        stdalgos::for_each(stdalgos::make_execution_properties(std::execution::par),
-                            [](int x) { std::cerr << "x = " << x << '\n'; }));
-                stdexec::this_thread::sync_wait(std::move(s));
+                stdexec::sync_wait(std::move(s));
             }
         }
 

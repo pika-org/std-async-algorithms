@@ -37,7 +37,7 @@ jobs:
       uses: actions/checkout@v3
       with:
         repository: NVIDIA/stdexec
-        ref: f4c9aff7aca8e811318785d4c9d581afe54a04a7
+        ref: 12511a35f382166016784c2968986df785ee65fe
         path: stdexec
     - name: Install stdexec
       working-directory: stdexec
